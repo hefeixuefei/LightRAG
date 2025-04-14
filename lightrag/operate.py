@@ -53,6 +53,23 @@ def chunking_by_token_size(
     max_token_size: int = 1024,
     tiktoken_model: str = "gpt-4o",
 ) -> list[dict[str, Any]]:
+    
+    """将给定的文本内容分割成多个标记块,每个块的大小不超过max_token_size,
+    并且相邻块之间有over lap_token_size个标记的重叠。
+
+    参数:
+    - content:需要分割的文本内容。
+    - overlap_token_size:相邻块之间重叠的标记数量,默认为128。
+    - max_token_size:每个块最大包合的标记数量,默认为1024。
+    - tiktoken_model:使用的模型名称,默认为"gpt-4o”。
+
+    返回:
+    - 一个列表,包含多个字典,每个字典表示一个文本块的信息,包括:
+    “tokens":该块包含的标记数量;
+    “content":该块的文本内容;
+    "chunk_order_index":该块在原始文本中的顺序索引。"""
+    
+    # 将文本内容编码成标记列表
     tokens = encode_string_by_tiktoken(content, model_name=tiktoken_model)
     results: list[dict[str, Any]] = []
     if split_by_character:
@@ -87,12 +104,15 @@ def chunking_by_token_size(
                 }
             )
     else:
+        # 遍历标记列表,按指定大小分割成多个块
         for index, start in enumerate(
             range(0, len(tokens), max_token_size - overlap_token_size)
         ):
+            # 解码标记列表中的一个子集,转换回文本内容
             chunk_content = decode_tokens_by_tiktoken(
                 tokens[start : start + max_token_size], model_name=tiktoken_model
             )
+            # # 将文本块的信息添加到结果列表中
             results.append(
                 {
                     "tokens": min(max_token_size, len(tokens) - start),
