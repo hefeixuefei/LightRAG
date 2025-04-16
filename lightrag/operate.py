@@ -1873,6 +1873,22 @@ async def naive_query(
     hashing_kv: BaseKVStorage | None = None,
     system_prompt: str | None = None,
 ) -> str | AsyncIterator[str]:
+    
+    '''
+    执行一个简单的查询,从向量数据库和文本块数据库中获取相关信息（同传统的RAG相同）。
+    
+    参数：
+        chunks_vdb(BaseVectorStorage):用于查询文本块的向量数据库。
+        text_chunks_db(BaseKVStorage[TextChunkSchema]):存储文本块的键值数据库。
+        query_param(QueryParam):查询参数。
+        global_config(dict):全局配置字典。
+        hashing_kv(BasekVStorage,可选):用于缓存的键值数据库,默认为None。
+
+    返回:
+        str:查询响应。
+    '''
+    
+    # 1. 检查缓存（如果缓存中存在相同的问题，则直接返回缓存中的结果）
     # Handle cache
     use_model_func = (
         query_param.model_func
@@ -1886,12 +1902,14 @@ async def naive_query(
     if cached_response is not None:
         return cached_response
 
+    # 2. 向量检素相似文本块
     results = await chunks_vdb.query(
         query, top_k=query_param.top_k, ids=query_param.ids
     )
     if not len(results):
         return PROMPTS["fail_response"]
 
+    # 3. 获取文本内容
     chunks_ids = [r["id"] for r in results]
     chunks = await text_chunks_db.get_by_ids(chunks_ids)
 
@@ -1904,6 +1922,7 @@ async def naive_query(
         logger.warning("No valid chunks found after filtering")
         return PROMPTS["fail_response"]
 
+    # 4. 截断过长文本
     maybe_trun_chunks = truncate_list_by_token_size(
         valid_chunks,
         key=lambda x: x["content"],
@@ -1917,7 +1936,8 @@ async def naive_query(
     logger.debug(
         f"Truncate chunks from {len(chunks)} to {len(maybe_trun_chunks)} (max tokens:{query_param.max_token_for_text_unit})"
     )
-
+    
+    # 5. 拼接文本块
     section = "\n--New Chunk--\n".join(
         [
             "File path: " + c["file_path"] + "\n" + c["content"]
