@@ -787,6 +787,24 @@ async def kg_query(
     hashing_kv: BaseKVStorage | None = None,
     system_prompt: str | None = None,
 ) -> str | AsyncIterator[str]:
+    
+    '''
+    异步函数,用于查询知识图谐。
+
+    参数:
+        - query(str):查询字符串。
+        - knowledge_graph_inst (BaseGraphStorage):知识图谐存储实例。
+        - entities_vdb(BaseVectorStorage):实体向量存储实例。
+        - relationships_vdb(BaseVectorStorage):关系向量存储实例。
+        - text_chunks_db(BaseKVStorage[TextChunkSchema]):文本块数据库实例。
+        - query_param (QueryParam):查询参数对象。
+        - global_config(dict):全局配置字典。
+        - hashing_kv(BasekVStorage,optional):缓存哈希键值存储实例,默认为None。
+
+    返回值:
+        - str:查询结果字符串。
+    '''
+    
     # Handle cache
     use_model_func = (
         query_param.model_func
@@ -837,26 +855,29 @@ async def kg_query(
         text_chunks_db,
         query_param,
     )
-
+    
+    # 1. 检查是否只需要上下文
     if query_param.only_need_context:
         return context
     if context is None:
         return PROMPTS["fail_response"]
-
+    
     # Process conversation history
     history_context = ""
     if query_param.conversation_history:
         history_context = get_conversation_turns(
             query_param.conversation_history, query_param.history_turns
         )
-
+        
+    # 2. 构建系统提示词
     sys_prompt_temp = system_prompt if system_prompt else PROMPTS["rag_response"]
     sys_prompt = sys_prompt_temp.format(
         context_data=context,
         response_type=query_param.response_type,
         history=history_context,
     )
-
+    
+    # 3. 检查是否只需要提示词
     if query_param.only_need_prompt:
         return sys_prompt
 
